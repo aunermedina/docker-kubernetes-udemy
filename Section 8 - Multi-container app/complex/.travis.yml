@@ -1,0 +1,35 @@
+language: generic
+sudo: required
+services:
+    - docker
+
+before_install:
+    - docker build -t aunermedina/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+    - docker run -e CI=true aunermedina/react-test npm test -- -coverage
+
+after_success:
+    - docker build -t aunermedina/multi-client ./client
+    - docker build -t aunermedina/multi-nginx ./nginx
+    - docker build -t aunermedina/multi-server ./server
+    - docker build -t aunermedina/multi-worker ./worker
+    # Log in to the docker CLI
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+    # take those images and push them to docker hub
+    - docker push aunermedina/multi-client
+    - docker push aunermedina/multi-nginx
+    - docker push aunermedina/multi-server
+    - docker push aunermedina/multi-worker
+
+deploy:
+    provider: elasticbeanstalk
+    region: "us-east-1"
+    app: "multi-docker"
+    env: "MultiDocker-env"
+    bucket_name: "elasticbeanstalk-us-east-1-881892357506"
+    bucket_path: "docker-multi"
+    on:
+        branch: master
+    access_key_id: $AWS_ACCESS_KEY
+    secret_access_key: $AWS_SECRET_KEY
